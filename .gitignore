@@ -56,3 +56,19 @@ metastore_db/
 
 .DS_Store
 Thumbs.db
+# ============================================================
+# Spark Generated Data
+# ============================================================
+
+sparkModule/output/
+
+# Spark temporary files
+spark-warehouse/
+metastore_db/
+
+# ============================================================
+# Logs
+# ============================================================
+
+*.log
+sparkModule/logs/
