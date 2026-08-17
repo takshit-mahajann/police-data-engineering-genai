@@ -9,14 +9,32 @@ from pyspark.sql import DataFrame
 
 def write_curated_data(
     df: DataFrame,
-    output_path: Path
+    output_path: Path,
+    mode: str = "overwrite"
 ):
     """
-    Write cleaned police data as partitioned Parquet.
+    Write curated police data as partitioned Parquet.
 
     Data is physically partitioned by:
         year
         month
+
+    Parameters
+    ----------
+    df : DataFrame
+        Curated Spark DataFrame.
+
+    output_path : Path
+        Curated data output directory.
+
+    mode : str
+        Spark write mode.
+
+        overwrite:
+            Replace existing curated data.
+
+        append:
+            Add new records to existing curated data.
     """
 
     output_path.mkdir(
@@ -26,10 +44,11 @@ def write_curated_data(
 
     print("\nWriting curated data...")
     print("Partitioning by: year, month")
+    print(f"Write mode: {mode}")
 
     (
         df.write
-        .mode("overwrite")
+        .mode(mode)
         .partitionBy(
             "year",
             "month"
@@ -51,10 +70,15 @@ def write_curated_data(
 
 def write_analytics_data(
     df: DataFrame,
-    output_path: Path
+    output_path: Path,
+    mode: str = "overwrite"
 ):
     """
     Write analytics DataFrame as Parquet.
+
+    Analytics data is overwritten by default because
+    aggregations are recalculated from the complete
+    curated dataset.
     """
 
     output_path.mkdir(
@@ -67,9 +91,13 @@ def write_analytics_data(
         f"{output_path}"
     )
 
+    print(
+        f"Write mode: {mode}"
+    )
+
     (
         df.write
-        .mode("overwrite")
+        .mode(mode)
         .parquet(
             str(output_path)
         )

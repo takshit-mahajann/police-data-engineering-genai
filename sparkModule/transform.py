@@ -1,8 +1,19 @@
 from pyspark.sql import SparkSession
 
+
+# ============================================================
+# SCHEMA / CLEANING / QUALITY
+# ============================================================
+
 from schema import POLICE_SCHEMA
+from schema_validation import validate_schema
 from cleaning import clean_data
 from quality import run_quality_checks
+
+
+# ============================================================
+# LOGGING / EXCEPTIONS
+# ============================================================
 
 from logger import get_logger
 
@@ -13,10 +24,16 @@ from exceptions import (
     PipelineWriteError
 )
 
+
+# ============================================================
+# CONFIGURATION
+# ============================================================
+
 from config import (
     RAW_DIR,
     CURATED_DIR,
     ANALYTICS_DIR,
+    CHECKPOINT_FILE,
     APP_NAME,
     INITIAL_REPARTITION_COUNT,
     FINAL_COALESCE_COUNT,
@@ -25,10 +42,32 @@ from config import (
     TOP_RESULT_ROWS
 )
 
+
+# ============================================================
+# INCREMENTAL PROCESSING
+# ============================================================
+
+from incremental import (
+    load_checkpoint,
+    save_checkpoint,
+    get_new_files,
+    add_processed_files
+)
+
+
+# ============================================================
+# OPTIMIZATION
+# ============================================================
+
 from optimization import (
     explain_plan,
-    get_partition_count as get_optimization_partition_count,
+    get_partition_count as get_optimization_partition_count
 )
+
+
+# ============================================================
+# PARTITIONING
+# ============================================================
 
 from partitioning import (
     get_partition_count,
@@ -36,6 +75,11 @@ from partitioning import (
     repartition_by_column,
     coalesce_data
 )
+
+
+# ============================================================
+# WINDOW FUNCTIONS
+# ============================================================
 
 from window import (
     add_previous_incident,
@@ -47,6 +91,11 @@ from window import (
     add_rolling_incident_count
 )
 
+
+# ============================================================
+# JOINS
+# ============================================================
+
 from joins import (
     inner_join,
     left_join,
@@ -54,10 +103,30 @@ from joins import (
     full_outer_join
 )
 
+
+# ============================================================
+# CACHE / PERSISTENCE
+# ============================================================
+
 from cache import (
     persist_data,
     unpersist_data
 )
+
+
+# ============================================================
+# DEDUPLICATION
+# ============================================================
+
+from deduplication import (
+    remove_batch_duplicates,
+    remove_existing_records
+)
+
+
+# ============================================================
+# AGGREGATIONS
+# ============================================================
 
 from aggregations import (
     incidents_by_type,
@@ -66,6 +135,11 @@ from aggregations import (
     incidents_by_hour,
     incidents_by_subtype
 )
+
+
+# ============================================================
+# STORAGE
+# ============================================================
 
 from storage import (
     write_curated_data,
@@ -106,9 +180,8 @@ def main():
             "Spark session created successfully."
         )
 
-
         # ====================================================
-        # PIPELINE HEADER
+        # HEADER
         # ====================================================
 
         print("=" * 60)
@@ -118,60 +191,154 @@ def main():
         print("\nRaw data directory:")
         print(RAW_DIR)
 
+        print("\nCheckpoint file:")
+        print(CHECKPOINT_FILE)
 
         # ====================================================
-        # FIND JSON FILES
+        # LOAD CHECKPOINT
         # ====================================================
 
-        print("\nFinding JSON files...")
+        print("\nLoading incremental checkpoint...")
+
+        processed_files = load_checkpoint(
+            CHECKPOINT_FILE
+        )
+
+        print(
+            f"Previously processed files: "
+            f"{len(processed_files)}"
+        )
+
+        logger.info(
+            f"Previously processed files: "
+            f"{len(processed_files)}"
+        )
+
+        # ====================================================
+        # FIND NEW FILES
+        # ====================================================
+
+        print("\nFinding new JSON files...")
+
+        new_files = get_new_files(
+            RAW_DIR,
+            processed_files
+        )
+
+        print(
+            f"New JSON files found: "
+            f"{len(new_files)}"
+        )
+
+        logger.info(
+            f"New JSON files found: "
+            f"{len(new_files)}"
+        )
+
+        # ====================================================
+        # NO NEW DATA
+        # ====================================================
+
+        if not new_files:
+
+            print(
+                "\nNo new data to process."
+            )
+
+            print(
+                "\nPYSPARK PIPELINE COMPLETED"
+            )
+
+            print(
+                "No new files were detected."
+            )
+
+            logger.info(
+                "No new files detected. "
+                "Pipeline completed without processing."
+            )
+
+            return
+
+        # ====================================================
+        # DISPLAY NEW FILES
+        # ====================================================
+
+        print("\nFiles to be processed:")
+
+        for file in new_files:
+
+            print(
+                f"  - {file}"
+            )
+
+        logger.info(
+            f"Processing {len(new_files)} new files."
+        )
+
+        # ====================================================
+        # READ RAW JSON
+        # ====================================================
+
+        print(
+            "\nReading new raw JSON data..."
+        )
 
         json_files = [
             str(file)
-            for file in RAW_DIR.rglob("*.json")
+            for file in new_files
         ]
 
-        print(
-            f"JSON files found: "
-            f"{len(json_files)}"
-        )
+        try:
 
-        logger.info(
-            f"JSON files found: {len(json_files)}"
-        )
+            df = (
+                spark.read
+                .schema(POLICE_SCHEMA)
+                .option("multiLine", True)
+                .json(json_files)
+            )
 
+        except Exception as e:
 
-        # ====================================================
-        # CHECK INPUT FILES
-        # ====================================================
-
-        if not json_files:
-
-            logger.error(
-                f"No JSON files found in: {RAW_DIR}"
+            logger.exception(
+                "Failed to read raw JSON data."
             )
 
             raise InputDataError(
-                f"No JSON files found in: {RAW_DIR}"
-            )
-
-
-        # ====================================================
-        # READ RAW DATA
-        # ====================================================
-
-        print("\nReading raw JSON data...")
-
-        df = (
-            spark.read
-            .schema(POLICE_SCHEMA)
-            .option("multiLine", True)
-            .json(json_files)
-        )
+                f"Unable to read input JSON files: {e}"
+            ) from e
 
         logger.info(
-            "Raw JSON data loaded successfully."
+            "New raw JSON data loaded successfully."
         )
 
+        # ====================================================
+        # SCHEMA VALIDATION
+        # ====================================================
+
+        print("\n")
+        print("=" * 60)
+        print("SCHEMA VALIDATION")
+        print("=" * 60)
+
+        schema_valid = validate_schema(
+            df
+        )
+
+        if not schema_valid:
+
+            logger.error(
+                "Incoming data failed schema validation."
+            )
+
+            raise InputDataError(
+                "Incoming data does not match "
+                "the expected schema."
+            )
+
+        logger.info(
+            "Schema validation passed."
+        )
 
         # ====================================================
         # RECORD COUNT BEFORE CLEANING
@@ -180,37 +347,40 @@ def main():
         records_before = df.count()
 
         print(
-            f"\nRecords before cleaning: "
+            f"\nNew records before cleaning: "
             f"{records_before}"
         )
 
         logger.info(
-            f"Records before cleaning: "
+            f"New records before cleaning: "
             f"{records_before}"
         )
-
 
         # ====================================================
         # SCHEMA BEFORE CLEANING
         # ====================================================
 
-        print("\nSchema before cleaning:")
+        print(
+            "\nSchema before cleaning:"
+        )
 
         df.printSchema()
-
 
         # ====================================================
         # CLEAN DATA
         # ====================================================
 
-        print("\nRunning data cleaning...")
+        print(
+            "\nRunning data cleaning..."
+        )
 
-        df = clean_data(df)
+        df = clean_data(
+            df
+        )
 
         logger.info(
             "Data cleaning completed."
         )
-
 
         # ====================================================
         # RECORD COUNT AFTER CLEANING
@@ -219,37 +389,32 @@ def main():
         records_after = df.count()
 
         print(
-            f"\nRecords after cleaning: "
+            f"\nNew records after cleaning: "
             f"{records_after}"
         )
 
         print(
-            f"Records removed: "
+            f"Records removed from new batch: "
             f"{records_before - records_after}"
         )
 
         logger.info(
-            f"Records after cleaning: "
+            f"New records after cleaning: "
             f"{records_after}"
         )
-
-        logger.info(
-            f"Records removed: "
-            f"{records_before - records_after}"
-        )
-
 
         # ====================================================
         # SCHEMA AFTER CLEANING
         # ====================================================
 
-        print("\nSchema after cleaning:")
+        print(
+            "\nSchema after cleaning:"
+        )
 
         df.printSchema()
 
-
         # ====================================================
-        # DATA QUALITY CHECKS
+        # DATA QUALITY
         # ====================================================
 
         print(
@@ -260,9 +425,8 @@ def main():
             run_quality_checks(df)
         )
 
-
         # ====================================================
-        # STOP IF QUALITY CHECKS FAIL
+        # QUALITY FAILURE
         # ====================================================
 
         if not quality_passed:
@@ -273,13 +437,144 @@ def main():
 
             raise DataQualityError(
                 "Data quality checks failed. "
-                "Curated data will not be written."
+                "Curated data will not be written "
+                "and checkpoint will not be updated."
             )
 
         logger.info(
             "Data quality checks passed."
         )
 
+        # ====================================================
+        # DEDUPLICATION
+        # ====================================================
+
+        print("\n")
+        print("=" * 60)
+        print("DEDUPLICATION")
+        print("=" * 60)
+
+        # ----------------------------------------------------
+        # CURRENT BATCH DUPLICATES
+        # ----------------------------------------------------
+
+        print(
+            "\nRemoving duplicate incidents "
+            "within current batch..."
+        )
+
+        df = remove_batch_duplicates(
+            df
+        )
+
+        # ----------------------------------------------------
+        # EXISTING CURATED DATA
+        # ----------------------------------------------------
+
+        if CURATED_DIR.exists():
+
+            print(
+                "\nExisting curated data found."
+            )
+
+            print(
+                "Checking new records against "
+                "existing curated data..."
+            )
+
+            try:
+
+                curated_df = (
+                    spark.read
+                    .parquet(
+                        str(CURATED_DIR)
+                    )
+                )
+
+                df = remove_existing_records(
+                    df,
+                    curated_df
+                )
+
+            except Exception as e:
+
+                logger.exception(
+                    "Failed while checking "
+                    "existing curated data."
+                )
+
+                raise PipelineWriteError(
+                    "Unable to perform "
+                    "incremental deduplication."
+                ) from e
+
+        else:
+
+            print(
+                "\nNo existing curated data found."
+            )
+
+            print(
+                "Treating current batch as "
+                "the initial dataset."
+            )
+
+        # ====================================================
+        # DEDUPLICATION COUNT
+        # ====================================================
+
+        deduplicated_count = df.count()
+
+        print(
+            f"\nRecords remaining after "
+            f"deduplication: "
+            f"{deduplicated_count}"
+        )
+
+        logger.info(
+            f"Records remaining after "
+            f"deduplication: "
+            f"{deduplicated_count}"
+        )
+
+        # ====================================================
+        # NO NEW RECORDS AFTER DEDUPLICATION
+        # ====================================================
+
+        if deduplicated_count == 0:
+
+            print(
+                "\nNo genuinely new incidents "
+                "remain after deduplication."
+            )
+
+            logger.info(
+                "No genuinely new incidents "
+                "remain after deduplication."
+            )
+
+            updated_processed_files = (
+                add_processed_files(
+                    processed_files,
+                    new_files
+                )
+            )
+
+            save_checkpoint(
+                CHECKPOINT_FILE,
+                updated_processed_files
+            )
+
+            print(
+                "\nCheckpoint updated successfully."
+            )
+
+            logger.info(
+                "Checkpoint updated successfully "
+                "after duplicate-only batch."
+            )
+
+            return
 
         # ====================================================
         # WINDOW FUNCTIONS
@@ -290,48 +585,53 @@ def main():
         print("WINDOW FUNCTIONS")
         print("=" * 60)
 
-
         print(
             "\n1. Adding previous incident timestamp..."
         )
 
-        df = add_previous_incident(df)
-
+        df = add_previous_incident(
+            df
+        )
 
         print(
             "2. Adding next incident timestamp..."
         )
 
-        df = add_next_incident(df)
-
+        df = add_next_incident(
+            df
+        )
 
         print(
             "3. Adding incident row number..."
         )
 
-        df = add_row_number(df)
-
+        df = add_row_number(
+            df
+        )
 
         print(
             "4. Adding incident rank..."
         )
 
-        df = add_rank(df)
-
+        df = add_rank(
+            df
+        )
 
         print(
             "5. Adding dense rank..."
         )
 
-        df = add_dense_rank(df)
-
+        df = add_dense_rank(
+            df
+        )
 
         print(
             "6. Calculating minutes since previous incident..."
         )
 
-        df = add_minutes_since_previous(df)
-
+        df = add_minutes_since_previous(
+            df
+        )
 
         print(
             "7. Calculating rolling incident count..."
@@ -342,14 +642,12 @@ def main():
             days=ROLLING_WINDOW_DAYS
         )
 
-
         logger.info(
             "Window functions completed."
         )
 
-
         # ====================================================
-        # SHOW WINDOW RESULTS
+        # WINDOW RESULTS
         # ====================================================
 
         print(
@@ -371,7 +669,6 @@ def main():
             truncate=False
         )
 
-
         # ====================================================
         # JOINS
         # ====================================================
@@ -386,15 +683,13 @@ def main():
         )
 
         print(
-            "Actual join will be performed when a "
-            "real reference dataset is added."
+            "No reference dataset is currently "
+            "required for the police incident pipeline."
         )
 
         logger.info(
-            "Join module loaded. "
-            "No reference dataset available for actual join."
+            "Join module loaded successfully."
         )
-
 
         # ====================================================
         # PARTITIONING
@@ -405,24 +700,16 @@ def main():
         print("PARTITIONING")
         print("=" * 60)
 
-
-        # ----------------------------------------------------
-        # CURRENT PARTITIONS
-        # ----------------------------------------------------
-
         initial_partitions = (
-            get_partition_count(df)
+            get_partition_count(
+                df
+            )
         )
 
         print(
             f"\nInitial number of partitions: "
             f"{initial_partitions}"
         )
-
-
-        # ----------------------------------------------------
-        # REPARTITION
-        # ----------------------------------------------------
 
         print(
             "\nRepartitioning data..."
@@ -434,18 +721,15 @@ def main():
         )
 
         repartitioned_partitions = (
-            get_partition_count(df)
+            get_partition_count(
+                df
+            )
         )
 
         print(
             f"Partitions after repartition: "
             f"{repartitioned_partitions}"
         )
-
-
-        # ----------------------------------------------------
-        # REPARTITION BY LOCATION
-        # ----------------------------------------------------
 
         print(
             "\nRepartitioning by location..."
@@ -458,18 +742,15 @@ def main():
         )
 
         location_partitions = (
-            get_partition_count(df)
+            get_partition_count(
+                df
+            )
         )
 
         print(
             f"Partitions after location repartition: "
             f"{location_partitions}"
         )
-
-
-        # ----------------------------------------------------
-        # COALESCE
-        # ----------------------------------------------------
 
         print(
             "\nReducing partitions using coalesce..."
@@ -481,7 +762,9 @@ def main():
         )
 
         final_partitions = (
-            get_partition_count(df)
+            get_partition_count(
+                df
+            )
         )
 
         print(
@@ -494,9 +777,8 @@ def main():
             f"{final_partitions}"
         )
 
-
         # ====================================================
-        # CACHING AND PERSISTENCE
+        # CACHE / PERSISTENCE
         # ====================================================
 
         print("\n")
@@ -504,13 +786,13 @@ def main():
         print("CACHING AND PERSISTENCE")
         print("=" * 60)
 
-
         print(
             "\nPersisting transformed DataFrame..."
         )
 
-        df = persist_data(df)
-
+        df = persist_data(
+            df
+        )
 
         print(
             "Materializing persisted DataFrame..."
@@ -527,7 +809,6 @@ def main():
             "DataFrame persisted successfully."
         )
 
-
         # ====================================================
         # PERFORMANCE OPTIMIZATION
         # ====================================================
@@ -537,20 +818,16 @@ def main():
         print("PERFORMANCE OPTIMIZATION")
         print("=" * 60)
 
-
-        print(
-            "\nCurrent partition count:"
-        )
-
         current_partitions = (
-            get_optimization_partition_count(df)
+            get_optimization_partition_count(
+                df
+            )
         )
 
         print(
-            f"Partitions: "
+            f"\nPartitions: "
             f"{current_partitions}"
         )
-
 
         print(
             "\nSpark execution plan:"
@@ -561,107 +838,9 @@ def main():
             extended=False
         )
 
-
         logger.info(
             "Performance analysis completed."
         )
-
-
-        # ====================================================
-        # ANALYTICS / AGGREGATIONS
-        # ====================================================
-
-        print("\n")
-        print("=" * 60)
-        print("ANALYTICS AGGREGATIONS")
-        print("=" * 60)
-
-
-        # ----------------------------------------------------
-        # 1. INCIDENTS BY TYPE
-        # ----------------------------------------------------
-
-        print(
-            "\nIncidents by Type:"
-        )
-
-        type_df = incidents_by_type(df)
-
-        type_df.show(
-            truncate=False
-        )
-
-
-        # ----------------------------------------------------
-        # 2. INCIDENTS BY MONTH
-        # ----------------------------------------------------
-
-        print(
-            "\nIncidents by Month:"
-        )
-
-        month_df = incidents_by_month(df)
-
-        month_df.show(
-            truncate=False
-        )
-
-
-        # ----------------------------------------------------
-        # 3. INCIDENTS BY LOCATION
-        # ----------------------------------------------------
-
-        print(
-            "\nTop Locations:"
-        )
-
-        location_df = (
-            incidents_by_location(df)
-        )
-
-        location_df.show(
-            TOP_RESULT_ROWS,
-            truncate=False
-        )
-
-
-        # ----------------------------------------------------
-        # 4. INCIDENTS BY HOUR
-        # ----------------------------------------------------
-
-        print(
-            "\nIncidents by Hour:"
-        )
-
-        hour_df = incidents_by_hour(df)
-
-        hour_df.show(
-            truncate=False
-        )
-
-
-        # ----------------------------------------------------
-        # 5. INCIDENTS BY SUBTYPE
-        # ----------------------------------------------------
-
-        print(
-            "\nTop Subtypes:"
-        )
-
-        subtype_df = (
-            incidents_by_subtype(df)
-        )
-
-        subtype_df.show(
-            TOP_RESULT_ROWS,
-            truncate=False
-        )
-
-
-        logger.info(
-            "All aggregations completed successfully."
-        )
-
 
         # ====================================================
         # WRITE CURATED DATA
@@ -676,7 +855,8 @@ def main():
 
             write_curated_data(
                 df,
-                CURATED_DIR
+                CURATED_DIR,
+                mode="append"
             )
 
         except Exception as e:
@@ -689,9 +869,137 @@ def main():
                 f"Failed to write curated data: {e}"
             ) from e
 
+        logger.info(
+            "New curated data written successfully."
+        )
 
         # ====================================================
-        # WRITE ANALYTICS DATA
+        # RELEASE CACHE
+        # ====================================================
+
+        unpersist_data(
+            df
+        )
+
+        # ====================================================
+        # READ COMPLETE CURATED DATA
+        # ====================================================
+
+        print(
+            "\nReading complete curated dataset "
+            "for analytics..."
+        )
+
+        try:
+
+            full_df = (
+                spark.read
+                .parquet(
+                    str(CURATED_DIR)
+                )
+            )
+
+        except Exception as e:
+
+            logger.exception(
+                "Failed to read complete curated data."
+            )
+
+            raise PipelineWriteError(
+                f"Failed to read curated data: {e}"
+            ) from e
+
+        full_records = (
+            full_df.count()
+        )
+
+        print(
+            f"Total curated records: "
+            f"{full_records}"
+        )
+
+        logger.info(
+            f"Total curated records: "
+            f"{full_records}"
+        )
+
+        # ====================================================
+        # ANALYTICS
+        # ====================================================
+
+        print("\n")
+        print("=" * 60)
+        print("ANALYTICS AGGREGATIONS")
+        print("=" * 60)
+
+        print(
+            "\nIncidents by Type:"
+        )
+
+        type_df = incidents_by_type(
+            full_df
+        )
+
+        type_df.show(
+            truncate=False
+        )
+
+        print(
+            "\nIncidents by Month:"
+        )
+
+        month_df = incidents_by_month(
+            full_df
+        )
+
+        month_df.show(
+            truncate=False
+        )
+
+        print(
+            "\nTop Locations:"
+        )
+
+        location_df = incidents_by_location(
+            full_df
+        )
+
+        location_df.show(
+            TOP_RESULT_ROWS,
+            truncate=False
+        )
+
+        print(
+            "\nIncidents by Hour:"
+        )
+
+        hour_df = incidents_by_hour(
+            full_df
+        )
+
+        hour_df.show(
+            truncate=False
+        )
+
+        print(
+            "\nTop Subtypes:"
+        )
+
+        subtype_df = incidents_by_subtype(
+            full_df
+        )
+
+        subtype_df.show(
+            TOP_RESULT_ROWS,
+            truncate=False
+        )
+
+        logger.info(
+            "All aggregations completed successfully."
+        )
+
+        # ====================================================
+        # WRITE ANALYTICS
         # ====================================================
 
         print("\n")
@@ -736,26 +1044,42 @@ def main():
                 f"Failed to write analytics data: {e}"
             ) from e
 
-
         logger.info(
-            "All output data written successfully."
+            "All analytics data written successfully."
         )
 
-
         # ====================================================
-        # RELEASE PERSISTED DATA
+        # UPDATE CHECKPOINT
         # ====================================================
 
         print(
-            "\nReleasing persisted DataFrame..."
+            "\nUpdating incremental checkpoint..."
         )
 
-        unpersist_data(df)
+        updated_processed_files = (
+            add_processed_files(
+                processed_files,
+                new_files
+            )
+        )
+
+        save_checkpoint(
+            CHECKPOINT_FILE,
+            updated_processed_files
+        )
+
+        print(
+            "Checkpoint updated successfully."
+        )
+
+        print(
+            f"Total processed files now: "
+            f"{len(updated_processed_files)}"
+        )
 
         logger.info(
-            "Persisted DataFrame released."
+            "Incremental checkpoint updated successfully."
         )
-
 
         # ====================================================
         # FINAL SUMMARY
@@ -764,23 +1088,39 @@ def main():
         print("\n")
         print("=" * 60)
         print(
-            "PYSPARK PIPELINE COMPLETED SUCCESSFULLY"
+            "INCREMENTAL PYSPARK PIPELINE "
+            "COMPLETED SUCCESSFULLY"
         )
         print("=" * 60)
 
         print(
-            f"\nInput records: "
+            f"\nNew input records: "
             f"{records_before}"
         )
 
         print(
-            f"Cleaned records: "
+            f"New cleaned records: "
             f"{records_after}"
         )
 
         print(
-            f"Records removed: "
+            f"New records removed: "
             f"{records_before - records_after}"
+        )
+
+        print(
+            f"New files processed: "
+            f"{len(new_files)}"
+        )
+
+        print(
+            f"Total processed files: "
+            f"{len(updated_processed_files)}"
+        )
+
+        print(
+            f"Total curated records: "
+            f"{full_records}"
         )
 
         print(
@@ -800,9 +1140,9 @@ def main():
         )
 
         logger.info(
-            "PySpark pipeline completed successfully."
+            "Incremental PySpark pipeline "
+            "completed successfully."
         )
-
 
     # ========================================================
     # PIPELINE ERRORS
@@ -816,7 +1156,6 @@ def main():
 
         raise
 
-
     # ========================================================
     # UNEXPECTED ERRORS
     # ========================================================
@@ -828,7 +1167,6 @@ def main():
         )
 
         raise
-
 
     # ========================================================
     # ALWAYS STOP SPARK

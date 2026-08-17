@@ -41,3 +41,11 @@ ROLLING_WINDOW_DAYS = 7
 WINDOW_RESULT_ROWS = 30
 
 TOP_RESULT_ROWS = 20
+
+# ============================================================
+# INCREMENTAL PROCESSING
+# ============================================================
+
+CHECKPOINT_DIR = PROJECT_ROOT / "ingestion"
+
+CHECKPOINT_FILE = CHECKPOINT_DIR / "checkpoint.json"
