@@ -1,0 +1,91 @@
+Loaded 11057 rows from CSV
+Rows with unparseable record_datetime: 0
+Rows with unparseable last_updated: 0
+Traceback (most recent call last):
+  File "/home/takshit_mahajan/miniconda3/envs/policeDE/lib/python3.10/site-packages/sqlalchemy/engine/base.py", line 1936, in _exec_single_context
+    self.dialect.do_executemany(
+  File "/home/takshit_mahajan/miniconda3/envs/policeDE/lib/python3.10/site-packages/sqlalchemy/dialects/mysql/mysqldb.py", line 196, in do_executemany
+    rowcount = cursor.executemany(statement, parameters)
+  File "/home/takshit_mahajan/miniconda3/envs/policeDE/lib/python3.10/site-packages/pymysql/cursors.py", line 188, in executemany
+    return self._do_execute_many(
+  File "/home/takshit_mahajan/miniconda3/envs/policeDE/lib/python3.10/site-packages/pymysql/cursors.py", line 226, in _do_execute_many
+    rows += self.execute(sql + postfix)
+  File "/home/takshit_mahajan/miniconda3/envs/policeDE/lib/python3.10/site-packages/pymysql/cursors.py", line 159, in execute
+    result = self._query(query)
+  File "/home/takshit_mahajan/miniconda3/envs/policeDE/lib/python3.10/site-packages/pymysql/cursors.py", line 330, in _query
+    conn.query(q)
+  File "/home/takshit_mahajan/miniconda3/envs/policeDE/lib/python3.10/site-packages/pymysql/connections.py", line 582, in query
+    self._affected_rows = self._read_query_result(unbuffered=unbuffered)
+  File "/home/takshit_mahajan/miniconda3/envs/policeDE/lib/python3.10/site-packages/pymysql/connections.py", line 847, in _read_query_result
+    result.read()
+  File "/home/takshit_mahajan/miniconda3/envs/policeDE/lib/python3.10/site-packages/pymysql/connections.py", line 1245, in read
+    first_packet = self.connection._read_packet()
+  File "/home/takshit_mahajan/miniconda3/envs/policeDE/lib/python3.10/site-packages/pymysql/connections.py", line 803, in _read_packet
+    packet.raise_for_error()
+  File "/home/takshit_mahajan/miniconda3/envs/policeDE/lib/python3.10/site-packages/pymysql/protocol.py", line 219, in raise_for_error
+    err.raise_mysql_exception(self._data)
+  File "/home/takshit_mahajan/miniconda3/envs/policeDE/lib/python3.10/site-packages/pymysql/err.py", line 154, in raise_mysql_exception
+    raise errorclass(errno, errval, sqlstate=sqlstate)
+pymysql.err.DataError: (1406, "Data too long for column 'location' at row 706")
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/mnt/d/AmitTrivediProj/chatbot/load_csv_to_mysql.py", line 41, in <module>
+    df.to_sql("police_log", engine, if_exists="append", index=False, chunksize=1000)
+  File "/home/takshit_mahajan/miniconda3/envs/policeDE/lib/python3.10/site-packages/pandas/util/_decorators.py", line 333, in wrapper
+    return func(*args, **kwargs)
+  File "/home/takshit_mahajan/miniconda3/envs/policeDE/lib/python3.10/site-packages/pandas/core/generic.py", line 3109, in to_sql
+    return sql.to_sql(
+  File "/home/takshit_mahajan/miniconda3/envs/policeDE/lib/python3.10/site-packages/pandas/io/sql.py", line 844, in to_sql
+    return pandas_sql.to_sql(
+  File "/home/takshit_mahajan/miniconda3/envs/policeDE/lib/python3.10/site-packages/pandas/io/sql.py", line 2030, in to_sql
+    total_inserted = sql_engine.insert_records(
+  File "/home/takshit_mahajan/miniconda3/envs/policeDE/lib/python3.10/site-packages/pandas/io/sql.py", line 1579, in insert_records
+    raise err
+  File "/home/takshit_mahajan/miniconda3/envs/policeDE/lib/python3.10/site-packages/pandas/io/sql.py", line 1570, in insert_records
+    return table.insert(chunksize=chunksize, method=method)
+  File "/home/takshit_mahajan/miniconda3/envs/policeDE/lib/python3.10/site-packages/pandas/io/sql.py", line 1121, in insert
+    num_inserted = exec_insert(conn, keys, chunk_iter)
+  File "/home/takshit_mahajan/miniconda3/envs/policeDE/lib/python3.10/site-packages/pandas/io/sql.py", line 1012, in _execute_insert
+    result = conn.execute(self.table.insert(), data)
+  File "/home/takshit_mahajan/miniconda3/envs/policeDE/lib/python3.10/site-packages/sqlalchemy/engine/base.py", line 1419, in execute
+    return meth(
+  File "/home/takshit_mahajan/miniconda3/envs/policeDE/lib/python3.10/site-packages/sqlalchemy/sql/elements.py", line 527, in _execute_on_connection
+    return connection._execute_clauseelement(
+  File "/home/takshit_mahajan/miniconda3/envs/policeDE/lib/python3.10/site-packages/sqlalchemy/engine/base.py", line 1641, in _execute_clauseelement
+    ret = self._execute_context(
+  File "/home/takshit_mahajan/miniconda3/envs/policeDE/lib/python3.10/site-packages/sqlalchemy/engine/base.py", line 1846, in _execute_context
+    return self._exec_single_context(
+  File "/home/takshit_mahajan/miniconda3/envs/policeDE/lib/python3.10/site-packages/sqlalchemy/engine/base.py", line 1986, in _exec_single_context
+    self._handle_dbapi_exception(
+  File "/home/takshit_mahajan/miniconda3/envs/policeDE/lib/python3.10/site-packages/sqlalchemy/engine/base.py", line 2363, in _handle_dbapi_exception
+    raise sqlalchemy_exception.with_traceback(exc_info[2]) from e
+  File "/home/takshit_mahajan/miniconda3/envs/policeDE/lib/python3.10/site-packages/sqlalchemy/engine/base.py", line 1936, in _exec_single_context
+    self.dialect.do_executemany(
+  File "/home/takshit_mahajan/miniconda3/envs/policeDE/lib/python3.10/site-packages/sqlalchemy/dialects/mysql/mysqldb.py", line 196, in do_executemany
+    rowcount = cursor.executemany(statement, parameters)
+  File "/home/takshit_mahajan/miniconda3/envs/policeDE/lib/python3.10/site-packages/pymysql/cursors.py", line 188, in executemany
+    return self._do_execute_many(
+  File "/home/takshit_mahajan/miniconda3/envs/policeDE/lib/python3.10/site-packages/pymysql/cursors.py", line 226, in _do_execute_many
+    rows += self.execute(sql + postfix)
+  File "/home/takshit_mahajan/miniconda3/envs/policeDE/lib/python3.10/site-packages/pymysql/cursors.py", line 159, in execute
+    result = self._query(query)
+  File "/home/takshit_mahajan/miniconda3/envs/policeDE/lib/python3.10/site-packages/pymysql/cursors.py", line 330, in _query
+    conn.query(q)
+  File "/home/takshit_mahajan/miniconda3/envs/policeDE/lib/python3.10/site-packages/pymysql/connections.py", line 582, in query
+    self._affected_rows = self._read_query_result(unbuffered=unbuffered)
+  File "/home/takshit_mahajan/miniconda3/envs/policeDE/lib/python3.10/site-packages/pymysql/connections.py", line 847, in _read_query_result
+    result.read()
+  File "/home/takshit_mahajan/miniconda3/envs/policeDE/lib/python3.10/site-packages/pymysql/connections.py", line 1245, in read
+    first_packet = self.connection._read_packet()
+  File "/home/takshit_mahajan/miniconda3/envs/policeDE/lib/python3.10/site-packages/pymysql/connections.py", line 803, in _read_packet
+    packet.raise_for_error()
+  File "/home/takshit_mahajan/miniconda3/envs/policeDE/lib/python3.10/site-packages/pymysql/protocol.py", line 219, in raise_for_error
+    err.raise_mysql_exception(self._data)
+  File "/home/takshit_mahajan/miniconda3/envs/policeDE/lib/python3.10/site-packages/pymysql/err.py", line 154, in raise_mysql_exception
+    raise errorclass(errno, errval, sqlstate=sqlstate)
+sqlalchemy.exc.DataError: (pymysql.err.DataError) (1406, "Data too long for column 'location' at row 706")
+[SQL: INSERT INTO police_log (record_datetime, id, type, subtype, location, description, last_updated) VALUES (%(record_datetime)s, %(id)s, %(type)s, %(subtype)s, %(location)s, %(description)s, %(last_updated)s)]
+[parameters: [{'record_datetime': datetime.datetime(2025, 4, 16, 12, 7), 'id': 25003282, 'type': 'INCIDENT', 'subtype': 'ACCOST/ANNOY PERSON OF OPPOSITE SEX C272 S53', 'location': 'BRATTLE ST', 'description': 'Police responded to a business on the 0 block of Brattle St for a report of harassment after an individual called the store phone and made inappropriate statements.', 'last_updated': datetime.datetime(2025, 4, 17, 16, 0, 4)}, {'record_datetime': datetime.datetime(2025, 4, 16, 16, 36), 'id': 25003294, 'type': 'INCIDENT', 'subtype': 'DESTRUCTION OF PROPERTY -$1200, MALICIOUS C266 S12', 'location': 'CLIFTON ST', 'description': 'Police responded to the 0 block of Clifton St for reports of a previous incident of malicious destruction. The victim reported that their rear side tire of their motor vehicle was punctured.', 'last_updated': datetime.datetime(2025, 4, 17, 16, 0, 4)}, {'record_datetime': datetime.datetime(2025, 4, 16, 16, 43), 'id': 25003291, 'type': 'INCIDENT', 'subtype': 'LARCENY FROM BUILDING C266 S20', 'location': 'PLYMOUTH ST', 'description': 'Police responded to the 0 block of Plymouth Street for a reported larceny where an individual stole a 10lbs bag of rock salt.', 'last_updated': datetime.datetime(2025, 4, 17, 16, 0, 4)}, {'record_datetime': datetime.datetime(2025, 4, 16, 17, 20), 'id': 25003293, 'type': 'INCIDENT', 'subtype': 'SHOPLIFTING BY CONCEALING MDSE C266 S30A', 'location': 'ALEWIFE BROOK PKWY', 'description': 'Police responded to a business on the 100 block of Alewife Brook Pkwy for a shoplifting where the individual had fled the store. A report was taken.', 'last_updated': datetime.datetime(2025, 4, 17, 16, 0, 4)}, {'record_datetime': datetime.datetime(2025, 4, 16, 17, 45), 'id': 25003292, 'type': 'INCIDENT', 'subtype': 'LEAVE SCENE OF PROPERTY DAMAGE C90 S24', 'location': 'CAMBRIDGE ST & QUINCY ST', 'description': 'A Winchester resident came into the police station to report a past hit and run that occurred at the intersection of Cambridge St & Quincy St.', 'last_updated': datetime.datetime(2025, 4, 17, 16, 0, 4)}, {'record_datetime': datetime.datetime(2025, 4, 16, 18, 31), 'id': 25003302, 'type': 'INCIDENT', 'subtype': 'LARCENY FROM BUILDING C266 S20', 'location': 'FROST ST', 'description': 'Police responded to the 0 block of Frost St to take a report from a resident about their bike that was stolen from Church St.', 'last_updated': datetime.datetime(2025, 4, 17, 16, 0, 4)}, {'record_datetime': datetime.datetime(2025, 4, 16, 18, 34), 'id': 25003297, 'type': 'INCIDENT', 'subtype': 'TRESPASS C266 S120', 'location': 'BENNETT ST', 'description': 'Police responded to a hotel on the 0 block of Bennett St for reports of individuals gaining access to the building. The individuals were trespassed and a report was taken.', 'last_updated': datetime.datetime(2025, 4, 17, 16, 0, 4)}, {'record_datetime': datetime.datetime(2025, 4, 16, 18, 42), 'id': 25003300, 'type': 'INCIDENT', 'subtype': 'SHOPLIFTING BY CONCEALING MDSE C266 S30A', 'location': 'RIVER ST', 'description': 'Police responded to a business on the 300 block of River Street for a report of a shoplifting. A report was taken.', 'last_updated': datetime.datetime(2025, 4, 17, 16, 0, 4)}  ... displaying 10 of 1000 total bound parameter sets ...  {'record_datetime': datetime.datetime(2025, 2, 25, 16, 49), 'id': 25001675, 'type': 'INCIDENT', 'subtype': 'LARCENY UNDER $1200 C266 S30(1)', 'location': 'PROSPECT ST', 'description': 'Police responded to the 100 block on Prospect St for reports of a package theft. A report was taken.', 'last_updated': datetime.datetime(2025, 3, 10, 16, 16, 21)}, {'record_datetime': datetime.datetime(2025, 2, 25, 16, 51), 'id': 25001676, 'type': 'INCIDENT', 'subtype': 'LARCENY OVER $1200 C266 S30', 'location': 'JFK ST', 'description': 'Police responded to a business located on the 0 block of JFK Street and Mt. Auburn Street for a past larceny. A report was taken.', 'last_updated': datetime.datetime(2025, 3, 10, 16, 16, 21)}]]
+(Background on this error at: https://sqlalche.me/e/20/9h9h)
